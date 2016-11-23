@@ -2,26 +2,16 @@ package main
 
 import (
 	"bufio"
-	"bytes"
-	"io"
 	"log"
 	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
-type Tick struct{}
-
 type Top struct {
-	interval int
-
-	mutex  sync.RWMutex
-	buffer bytes.Buffer
-	idle   chan Tick
-
+	cmd     *IdleCmd
 	scanner *bufio.Scanner
 	results []Process
 
@@ -40,19 +30,6 @@ type Process struct {
 }
 
 func NewTop(interval int) *Top {
-	t := &Top{interval: interval, NextTick: make(chan Tick)}
-	// log.Println("starting top: taking lock")
-	t.mutex.Lock()
-	// log.Println("starting top: taken lock")
-	go t.run()
-	return t
-}
-
-func (t *Top) ProcessList() []Process {
-	return t.results
-}
-
-func (t *Top) run() {
 	// Processes: 306 total, 2 running, 2 stuck, 302 sleeping, 1772 threads
 	// 2016/11/20 20:18:55
 	// Load Avg: 1.36, 1.41, 1.35
@@ -69,61 +46,33 @@ func (t *Top) run() {
 	// 99156  0.0  2     sleeping 00:00.55 190+     printtool
 	// 83615  0.0  14    sleeping 03:06.73 6089+    Google Chrome He
 	// 80917  0.0  10    sleeping 00:10.14 1+       Google Chrome He
+	cmd := exec.Command("top", "-l", "0", "-s", strconv.Itoa(interval), "-stats", "pid,cpu,th,pstate,time,pageins,command")
+	top := &Top{cmd: RunIdleCmd(cmd, 400*time.Millisecond), NextTick: make(chan Tick)}
+	go top.watch()
+	return top
+}
 
-	cmd := exec.Command("top", "-l", "0", "-s", strconv.Itoa(t.interval), "-stats", "pid,cpu,th,pstate,time,pageins,command")
-	r, w, idle := timeoutPipe(400 * time.Millisecond)
-	cmd.Stdout = w
-	go func() {
-		for {
-			log.Println("run: starting copy to buffer")
-			_, err := io.Copy(&t.buffer, r)
-			if err != nil {
-				log.Fatal(err)
-			}
-			log.Fatal("unexpected: run: copy to buffer ended")
-		}
-	}()
-	t.idle = idle
-	go t.watch()
-	log.Println("run: starting command")
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-	}
-	// log.Println("run: releasing lock")
-	t.mutex.Unlock()
-	// log.Println("run: waiting on command to finish")
-	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
-	}
-	log.Fatal("unexpected: run: command ended")
+func (t *Top) ProcessList() []Process {
+	return t.results
 }
 
 func (t *Top) watch() {
-	log.Println("watch: starting")
 	counter := 0
 	for {
 		select {
-		case <-t.idle:
-			// log.Println("watch: idle, taking lock")
-			t.mutex.RLock()
-			// log.Println("watch: idle, taken lock")
-
-			if counter > 0 {
-				t.scanner = bufio.NewScanner(&t.buffer)
+		case <-t.cmd.Idle:
+			if counter > 0 { // We go idle before the first batch of output is received
+				t.scanner = bufio.NewScanner(&t.cmd.BufStdout)
 				t.results = t.scanResults()
 			}
-			t.buffer.Reset()
-
-			// log.Println("watch: idle, releasing lock")
-			t.mutex.RUnlock()
+			t.cmd.BufStdout.Reset()
 			counter += 1
 		}
-		if counter > 1 {
+		if counter > 1 { // macOS `top` has bullshit CPU results on the first tick
 			select {
 			case t.NextTick <- Tick{}:
-				// log.Println("watch: sent next tick")
 			default:
-				// log.Println("watch: sent nothing")
+				// Don't block on notifying about next tick.
 			}
 		}
 	}
@@ -204,62 +153,4 @@ func (t *Top) scanResults() (results []Process) {
 		log.Fatal(err)
 	}
 	return results
-}
-
-// -----------------------------------------------------------------------------
-
-type timeoutWriter struct {
-	writer    *io.PipeWriter
-	heartbeat chan Tick
-}
-
-func (t *timeoutWriter) Write(p []byte) (n int, err error) {
-	// log.Println("tw: got a write")
-	select {
-	case t.heartbeat <- Tick{}:
-		// log.Printf("tw: sent heartbeat")
-	default:
-		// log.Printf("tw: you don't care")
-	}
-	return t.writer.Write(p)
-}
-
-func (t *timeoutWriter) Close() error {
-	return t.writer.Close()
-}
-
-func (t *timeoutWriter) notifyOnTimeout(d time.Duration, timeout chan Tick) {
-	stalled := false
-	for {
-		if stalled {
-			// log.Println("tw: waiting on heartbeat now")
-			select {
-			case <-t.heartbeat:
-				// log.Println("tw: got a heartbeat (resurrected)")
-				stalled = false
-			}
-		} else {
-			select {
-			case <-t.heartbeat:
-				// log.Println("tw: got a heartbeat")
-			case <-time.After(d):
-				// log.Println("tw: stalled!")
-				stalled = true
-				select {
-				case timeout <- Tick{}:
-					// log.Println("tw: let you know :)")
-				default:
-					// log.Println("tw: you're not interested :(")
-				}
-			}
-		}
-	}
-}
-
-func timeoutPipe(d time.Duration) (io.ReadCloser, io.WriteCloser, chan Tick) {
-	r, pw := io.Pipe()
-	tw := &timeoutWriter{writer: pw, heartbeat: make(chan Tick)}
-	timeout := make(chan Tick)
-	go tw.notifyOnTimeout(d, timeout)
-	return r, tw, timeout
 }
