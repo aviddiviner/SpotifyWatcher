@@ -45,10 +45,9 @@ func (t *Top) watch() {
 		select {
 		case <-t.cmd.Idle:
 			if counter > 0 { // We go idle before the first batch of output is received
-				t.scanner = bufio.NewScanner(&t.cmd.BufStdout)
+				t.scanner = bufio.NewScanner(t.cmd.Buffer())
 				t.results = t.scanResults()
 			}
-			t.cmd.BufStdout.Reset()
 			counter += 1
 		}
 		if counter > 1 { // macOS `top` has bullshit CPU results on the first tick
@@ -109,7 +108,6 @@ func parseTopLine(line string) (p Process) {
 	}()
 
 	fields := strings.Fields(line)
-	l := len(fields)
 	p = Process{
 		Pid:     fields[0],
 		Cpu:     fields[1],
@@ -118,7 +116,7 @@ func parseTopLine(line string) (p Process) {
 		Time:    fields[4],
 		Pageins: fields[5],
 		// command name may be split on space
-		Command: strings.Join(fields[6:l], " "),
+		Command: strings.Join(fields[6:], " "),
 	}
 	return
 }
