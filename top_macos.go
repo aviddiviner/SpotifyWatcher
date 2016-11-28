@@ -42,13 +42,10 @@ func (t *Top) ProcessList() []Process {
 func (t *Top) watch() {
 	counter := 0
 	for {
-		select {
-		case <-t.cmd.Idle:
-			if counter > 0 { // We go idle before the first batch of output is received
-				t.scanner = bufio.NewScanner(t.cmd)
-				t.results = t.scanResults()
-			}
-			counter += 1
+		<-t.cmd.Idle
+		if counter > 0 { // We go idle before the first batch of output is received
+			t.scanner = bufio.NewScanner(t.cmd)
+			t.results = t.scanResults()
 		}
 		if counter > 1 { // macOS `top` has bullshit CPU results on the first tick
 			select {
@@ -57,6 +54,7 @@ func (t *Top) watch() {
 				// Don't block on notifying about next tick.
 			}
 		}
+		counter += 1
 	}
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"os"
 )
 
 type Top struct {
@@ -21,4 +22,12 @@ type Process struct {
 	State   string
 	Time    string
 	Pageins string
+}
+
+func kill(pid int) (err error) {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return
+	}
+	return proc.Kill()
 }
