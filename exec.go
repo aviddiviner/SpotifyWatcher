@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"io"
 	"log"
 	"os/exec"
@@ -12,8 +10,7 @@ import (
 type Tick struct{}
 
 type IdleCmd struct {
-	Stdout io.Reader
-	buf    *bufio.Writer
+	buf *Buffer
 
 	// Idle sends a Tick whenever the command output goes idle.
 	Idle chan Tick
@@ -24,37 +21,18 @@ type IdleCmd struct {
 // Idle channel. The timer is reset when writes resume.
 // There is no guarantee that the buffer won't be written to at any time.
 func RunIdleCmd(cmd *exec.Cmd, idleAfter time.Duration) *IdleCmd {
-	c := &IdleCmd{Idle: make(chan Tick)}
+	c := &IdleCmd{Idle: make(chan Tick), buf: new(Buffer)}
 	go c.startAndWait(cmd, idleAfter)
 	return c
 }
 
-func (c *IdleCmd) Buffer() *bytes.Buffer {
-	var bb bytes.Buffer
-
-	// Copy exactly what we've buffered.
-	go func(n int) {
-		if _, err := io.CopyN(&bb, c.Stdout, int64(n)); err != nil {
-			log.Fatal(err)
-		}
-	}(c.buf.Buffered())
-
-	// Flush blocks on the underlying writer (the write end of the pipe).
-	if err := c.buf.Flush(); err != nil {
-		log.Fatal(err)
-	}
-
-	return &bb
+// Read returns the buffered command output.
+func (c *IdleCmd) Read(p []byte) (n int, err error) {
+	return c.buf.Read(p)
 }
 
 func (c *IdleCmd) startAndWait(cmd *exec.Cmd, idleAfter time.Duration) {
-	r, w := io.Pipe()
-	c.Stdout = r
-	c.buf = bufio.NewWriterSize(w, 4069*1024)
-
-	// Buffer command output.
 	cmd.Stdout = IdleWriter(c.buf, idleAfter, c.Idle)
-
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 	}

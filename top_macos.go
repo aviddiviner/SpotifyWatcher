@@ -45,7 +45,7 @@ func (t *Top) watch() {
 		select {
 		case <-t.cmd.Idle:
 			if counter > 0 { // We go idle before the first batch of output is received
-				t.scanner = bufio.NewScanner(t.cmd.Buffer())
+				t.scanner = bufio.NewScanner(t.cmd)
 				t.results = t.scanResults()
 			}
 			counter += 1
