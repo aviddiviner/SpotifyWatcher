@@ -40,11 +40,12 @@ func main() {
 				if strings.HasPrefix(p.Command, "Spotify") {
 					log.Printf("%#v\n", p)
 					if p.Command == "Spotify" {
-						spotify.observe(p)
+						if err := spotify.observe(p); err != nil {
+							log.Fatal(err)
+						}
 					}
 				}
 			}
-			log.Println("---")
 		}
 	}
 }
