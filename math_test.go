@@ -43,5 +43,13 @@ func TestMovingAvg(t *testing.T) {
 			t.Errorf("MovingAvg(%d, %.2f) => got %.2f, want %.2f", i, tt.in, result, expected)
 		}
 	}
-
+	avg.Reset()
+	for i, tt := range movingAvgTestTable {
+		avg.Append(tt.in)
+		result := strconv.FormatFloat(avg.Value(), 'f', 2, 64)
+		expected := strconv.FormatFloat(tt.out, 'f', 2, 64)
+		if result != expected {
+			t.Errorf("MovingAvg(%d, %.2f) => got %.2f, want %.2f", i, tt.in, result, expected)
+		}
+	}
 }

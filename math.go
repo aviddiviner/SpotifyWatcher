@@ -25,6 +25,15 @@ func (v *MovingAvg) Value() float64 {
 	return total / float64(len(v.window))
 }
 
+func (v *MovingAvg) Reset() {
+	v.idx = 0
+	v.window = v.window[:0]
+}
+
+func (v *MovingAvg) Samples() int {
+	return len(v.window)
+}
+
 func NewMovingAvg(size int) *MovingAvg {
 	if size <= 0 {
 		panic("invalid window size")
