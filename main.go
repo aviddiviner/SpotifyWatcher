@@ -66,14 +66,14 @@ func (t *tracker) observe(p Process) error {
 	}
 	// Active in the foreground; ignore, unless forceful.
 	if state == StateForeground && !opts.forceful {
-		fmt.Printf(">>> Observed Spotify: foreground (ignored), CPU: %.2f\n", cpu)
+		fmt.Printf("Spotify: foreground (ignored), CPU: %.2f\n", cpu)
 		return nil
 	}
 
 	t.avgCpu.Append(cpu)
 	samples := t.avgCpu.Samples()
 	average := t.avgCpu.Value()
-	fmt.Printf(">>> Observed Spotify: %s, CPU: %.2f (%.2f avg, %d samples)\n", state, cpu, average, samples)
+	fmt.Printf("Spotify: %s, CPU: %.2f (%.2f avg, samples: %d)\n", state, cpu, average, samples)
 
 	// Take action if we have sufficient samples.
 	if samples == opts.avgWindow {
@@ -116,7 +116,7 @@ func main() {
 
 	tracker := &tracker{avgCpu: NewMovingAvg(opts.avgWindow)}
 	top := NewTop(opts.topInterval)
-	fmt.Printf("Collecting samples (~%d secs)...\n", opts.topInterval*opts.avgWindow)
+	fmt.Println("Waiting to observe Spotify...")
 	for {
 		select {
 		case <-top.NextTick:
@@ -127,10 +127,10 @@ func main() {
 					return
 				}
 				if !headerShown {
-					fmt.Printf("%-6s %-4s %-5s %-8s %-8s %-8s %s\n", "PID", "CPU", "#TH", "STATE", "TIME", "PAGEINS", "COMMAND")
+					fmt.Printf("  %-6s %-4s %-5s %-8s %-8s %-8s %s\n", "PID", "CPU", "#TH", "STATE", "TIME", "PAGEINS", "COMMAND")
 					headerShown = true
 				}
-				fmt.Printf("%-6s %-4s %-5s %-8s %-8s %-8s %s\n", p.Pid, p.Cpu, p.Threads, p.State, p.Time, p.Pageins, p.Command)
+				fmt.Printf("  %-6s %-4s %-5s %-8s %-8s %-8s %s\n", p.Pid, p.Cpu, p.Threads, p.State, p.Time, p.Pageins, p.Command)
 			}
 			for _, p := range top.ProcessList() {
 				if strings.HasPrefix(p.Command, "Spotify") {
