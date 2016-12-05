@@ -14,10 +14,10 @@ Currently only works for macOS.
 ## Usage
 ```console
 $ ./SpotifyWatcher --help
-Monitor Spotify CPU usage and kill it if it misbehaves.
+Monitor Spotify background CPU usage and kill it if it misbehaves.
 
 Usage:
-  SpotifyWatcher [-t SECONDS] [-i CPU] [-p CPU] [-s SAMPLES]
+  SpotifyWatcher [-t SECONDS] [-i CPU] [-p CPU] [-s SAMPLES] [-f] [-v]
   SpotifyWatcher -h | --help | --version
 
 Options:
@@ -25,6 +25,8 @@ Options:
   -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
   -s SAMPLES    Moving average sample window size [default: 5].
+  -f --force    Kill Spotify even if it's the frontmost (active) window.
+  -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.
   --version     Show version.
 ```

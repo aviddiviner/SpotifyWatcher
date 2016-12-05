@@ -9,10 +9,10 @@ import (
 	"github.com/aviddiviner/docopt-go"
 )
 
-var usage = `Monitor Spotify CPU usage and kill it if it misbehaves.
+var usage = `Monitor Spotify background CPU usage and kill it if it misbehaves.
 
 Usage:
-  SpotifyWatcher [-t SECONDS] [-i CPU] [-p CPU] [-s SAMPLES] [-v]
+  SpotifyWatcher [-t SECONDS] [-i CPU] [-p CPU] [-s SAMPLES] [-f] [-v]
   SpotifyWatcher -h | --help | --version
 
 Options:
@@ -20,6 +20,7 @@ Options:
   -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
   -s SAMPLES    Moving average sample window size [default: 5].
+  -f --force    Kill Spotify even if it's the frontmost (active) window.
   -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.
   --version     Show version.`
@@ -29,6 +30,7 @@ type options struct {
 	idleThreshold float64
 	busyThreshold float64
 	avgWindow     int
+	forceful      bool
 	verbose       bool
 }
 
@@ -61,15 +63,26 @@ func (t *tracker) observe(p Process) error {
 	if t.avgCpu.Samples() == opts.avgWindow {
 		avgCpu := t.avgCpu.Value()
 		fmt.Printf(">>> Spotify CPU: %.2f (avg: %.2f)\n", cpu, avgCpu)
-		if avgCpu > opts.busyThreshold {
-			return t.kill(p)
-		}
 		if avgCpu > opts.idleThreshold {
+			// If we're forceful and over the high threshold, we're gonna die.
+			if avgCpu > opts.busyThreshold && opts.forceful {
+				return t.kill(p)
+			}
+			// Check if we're frontmost (active) or playing in the background.
 			state, err := SpotifyState()
 			if err != nil {
 				return err
 			}
 			fmt.Printf(">>> Spotify State: %s\n", state)
+			// Active in the foreground; leave alone, unless forceful.
+			if state == StateActive && !opts.forceful {
+				return nil
+			}
+			// Too busy in the background; kill.
+			if avgCpu > opts.busyThreshold {
+				return t.kill(p)
+			}
+			// Not playing in the background, but idling high; kill.
 			if state != StatePlaying {
 				return t.kill(p)
 			}
@@ -91,6 +104,9 @@ func main() {
 	}
 	if val, err := args.Int("-s"); err == nil {
 		opts.avgWindow = val
+	}
+	if val, err := args.Bool("--force"); err == nil {
+		opts.forceful = val
 	}
 	if val, err := args.Bool("--verbose"); err == nil {
 		opts.verbose = val
