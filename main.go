@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -11,7 +12,7 @@ import (
 var usage = `Monitor Spotify CPU usage and kill it if it misbehaves.
 
 Usage:
-  SpotifyWatcher [-t SECONDS] [-i CPU] [-p CPU] [-s SAMPLES]
+  SpotifyWatcher [-t SECONDS] [-i CPU] [-p CPU] [-s SAMPLES] [-v]
   SpotifyWatcher -h | --help | --version
 
 Options:
@@ -19,6 +20,7 @@ Options:
   -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
   -s SAMPLES    Moving average sample window size [default: 5].
+  -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.
   --version     Show version.`
 
@@ -27,6 +29,7 @@ type options struct {
 	idleThreshold float64
 	busyThreshold float64
 	avgWindow     int
+	verbose       bool
 }
 
 var opts = options{}
@@ -36,7 +39,7 @@ type tracker struct {
 }
 
 func (t *tracker) kill(p Process) error {
-	log.Printf(">>> Killing Spotify!")
+	fmt.Println(">>> Killing Spotify!")
 	pid, err := strconv.Atoi(p.Pid)
 	if err != nil {
 		return err
@@ -57,7 +60,7 @@ func (t *tracker) observe(p Process) error {
 	t.avgCpu.Append(cpu)
 	if t.avgCpu.Samples() == opts.avgWindow {
 		avgCpu := t.avgCpu.Value()
-		log.Printf(">>> Spotify CPU: %.2f (avg: %.2f)\n", cpu, avgCpu)
+		fmt.Printf(">>> Spotify CPU: %.2f (avg: %.2f)\n", cpu, avgCpu)
 		if avgCpu > opts.busyThreshold {
 			return t.kill(p)
 		}
@@ -66,7 +69,7 @@ func (t *tracker) observe(p Process) error {
 			if err != nil {
 				return err
 			}
-			log.Printf(">>> Spotify State: %s\n", state)
+			fmt.Printf(">>> Spotify State: %s\n", state)
 			if state != StatePlaying {
 				return t.kill(p)
 			}
@@ -89,18 +92,32 @@ func main() {
 	if val, err := args.Int("-s"); err == nil {
 		opts.avgWindow = val
 	}
-	log.Printf("Starting with options: %+v\n", opts)
+	if val, err := args.Bool("--verbose"); err == nil {
+		opts.verbose = val
+	}
+	fmt.Printf("Starting with options: %+v\n", opts)
 
 	tracker := &tracker{avgCpu: NewMovingAvg(opts.avgWindow)}
 	top := NewTop(opts.topInterval)
-	log.Println("Waiting...")
+	fmt.Printf("Collecting samples (~%d secs)...\n", opts.topInterval*opts.avgWindow)
 	for {
 		select {
 		case <-top.NextTick:
 			var spotify Process
+			headerShown := false
+			showProcessLine := func(p Process) {
+				if !opts.verbose {
+					return
+				}
+				if !headerShown {
+					fmt.Printf("%-6s %-4s %-5s %-8s %-8s %-8s %s\n", "PID", "CPU", "#TH", "STATE", "TIME", "PAGEINS", "COMMAND")
+					headerShown = true
+				}
+				fmt.Printf("%-6s %-4s %-5s %-8s %-8s %-8s %s\n", p.Pid, p.Cpu, p.Threads, p.State, p.Time, p.Pageins, p.Command)
+			}
 			for _, p := range top.ProcessList() {
 				if strings.HasPrefix(p.Command, "Spotify") {
-					log.Printf("%#v\n", p)
+					showProcessLine(p)
 					if p.Command == "Spotify" {
 						spotify = p
 					}
