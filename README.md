@@ -25,7 +25,7 @@ Options:
   -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
   -s SAMPLES    Moving average sample window size [default: 5].
-  -f --force    Kill Spotify even if it's the frontmost (active) window.
+  -f --force    Monitor CPU even if Spotify is the frontmost (active) window.
   -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.
   --version     Show version.

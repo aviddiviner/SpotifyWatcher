@@ -20,7 +20,7 @@ Options:
   -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
   -s SAMPLES    Moving average sample window size [default: 5].
-  -f --force    Kill Spotify even if it's the frontmost (active) window.
+  -f --force    Monitor CPU even if Spotify is the frontmost (active) window.
   -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.
   --version     Show version.`
@@ -59,33 +59,34 @@ func (t *tracker) observe(p Process) error {
 	if err != nil {
 		return err
 	}
+	// Check state: foreground, background (playing/paused/etc).
+	state, err := SpotifyState()
+	if err != nil {
+		return err
+	}
+	// Active in the foreground; ignore, unless forceful.
+	if state == StateForeground && !opts.forceful {
+		fmt.Printf(">>> Observed Spotify: foreground (ignored), CPU: %.2f\n", cpu)
+		return nil
+	}
+
 	t.avgCpu.Append(cpu)
-	if t.avgCpu.Samples() == opts.avgWindow {
-		avgCpu := t.avgCpu.Value()
-		fmt.Printf(">>> Spotify CPU: %.2f (avg: %.2f)\n", cpu, avgCpu)
-		if avgCpu > opts.idleThreshold {
-			// If we're forceful and over the high threshold, we're gonna die.
-			if avgCpu > opts.busyThreshold && opts.forceful {
-				return t.kill(p)
-			}
-			// Check if we're frontmost (active) or playing in the background.
-			state, err := SpotifyState()
-			if err != nil {
-				return err
-			}
-			fmt.Printf(">>> Spotify State: %s\n", state)
-			// Active in the foreground; leave alone, unless forceful.
-			if state == StateActive && !opts.forceful {
-				return nil
-			}
-			// Too busy in the background; kill.
-			if avgCpu > opts.busyThreshold {
-				return t.kill(p)
-			}
-			// Not playing in the background, but idling high; kill.
-			if state != StatePlaying {
-				return t.kill(p)
-			}
+	samples := t.avgCpu.Samples()
+	average := t.avgCpu.Value()
+	fmt.Printf(">>> Observed Spotify: %s, CPU: %.2f (%.2f avg, %d samples)\n", state, cpu, average, samples)
+
+	// Take action if we have sufficient samples.
+	if samples == opts.avgWindow {
+		// Too busy; kill.
+		if average > opts.busyThreshold {
+			return t.kill(p)
+		}
+		if state == StatePlaying || state == StateForeground {
+			return nil
+		}
+		// In the background, not playing, but idling high; kill.
+		if average > opts.idleThreshold {
+			return t.kill(p)
 		}
 	}
 	return nil

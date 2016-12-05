@@ -12,8 +12,8 @@ type State int
 
 func (s State) String() string {
 	switch s {
-	case StateActive:
-		return "active"
+	case StateForeground:
+		return "foreground"
 	case StateStopped:
 		return "stopped"
 	case StatePlaying:
@@ -28,7 +28,7 @@ func (s State) String() string {
 
 const (
 	StateUnknown State = iota
-	StateActive
+	StateForeground
 	StateStopped
 	StatePlaying
 	StatePaused
@@ -41,8 +41,8 @@ func SpotifyState() (s State, err error) {
 		return
 	}
 	switch strings.TrimSpace(string(out)) {
-	case "active":
-		s = StateActive
+	case "foreground":
+		s = StateForeground
 	case "stopped":
 		s = StateStopped
 	case "playing":

@@ -1,7 +1,7 @@
 #!/usr/bin/env osascript
 
 if application "Spotify" is frontmost then
-	return "active"
+	return "foreground"
 end if
 if application "Spotify" is running then
 	tell application "Spotify"
