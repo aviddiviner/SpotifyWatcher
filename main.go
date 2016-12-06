@@ -133,17 +133,22 @@ func main() {
 			var spotify Process
 			batch := metrics.NewBatch()
 			addMetricPoint := func(p Process) {
+				// TODO: Better Process struct, do this in parseTopLine() rather.
+				pid, _ := strconv.Atoi(p.Pid)
+				cpu, _ := strconv.ParseFloat(p.Cpu, 64)
+				threads, _ := strconv.Atoi(p.Threads)
+				pageins, _ := strconv.Atoi(p.Pageins)
 				metrics.AddPoint(batch, "process",
 					metricTags{
 						"command": p.Command,
 					},
 					metricFields{
-						"pid":     p.Pid,
-						"cpu":     p.Cpu,
-						"threads": p.Threads,
+						"pid":     pid,
+						"cpu":     cpu,
+						"threads": threads,
 						"state":   p.State,
 						"time":    p.Time,
-						"pageins": p.Pageins,
+						"pageins": pageins,
 						"command": p.Command,
 					})
 			}
