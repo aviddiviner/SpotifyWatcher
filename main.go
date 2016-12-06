@@ -12,14 +12,14 @@ import (
 var usage = `Monitor Spotify background CPU usage and kill it if it misbehaves.
 
 Usage:
-  SpotifyWatcher [-t SECONDS] [-i CPU] [-p CPU] [-s SAMPLES] [-f] [-v]
+  SpotifyWatcher [-s SECONDS] [-i CPU] [-p CPU] [-n SAMPLES] [-f] [-v]
   SpotifyWatcher -h | --help | --version
 
 Options:
-  -t SECONDS    Interval in secs with which to poll 'top' [default: 3].
+  -s SECONDS    Interval in secs with which to poll 'top' [default: 3].
   -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
-  -s SAMPLES    Moving average sample window size [default: 5].
+  -n SAMPLES    Moving average sample window size [default: 5].
   -f --force    Monitor CPU even if Spotify is the frontmost (active) window.
   -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.
@@ -92,26 +92,31 @@ func (t *tracker) observe(p Process) error {
 	return nil
 }
 
-func main() {
-	args, _ := docopt.ParseArgs(usage, nil, "0.2")
-	if val, err := args.Int("-t"); err == nil {
-		opts.topInterval = val
+func parseOptions(argv []string) (o options) {
+	args, _ := docopt.ParseArgs(usage, argv, "0.2")
+	if val, err := args.Int("-s"); err == nil {
+		o.topInterval = val
 	}
 	if val, err := args.Float64("-i"); err == nil {
-		opts.idleThreshold = val
+		o.idleThreshold = val
 	}
 	if val, err := args.Float64("-p"); err == nil {
-		opts.busyThreshold = val
+		o.busyThreshold = val
 	}
-	if val, err := args.Int("-s"); err == nil {
-		opts.avgWindow = val
+	if val, err := args.Int("-n"); err == nil {
+		o.avgWindow = val
 	}
 	if val, err := args.Bool("--force"); err == nil {
-		opts.forceful = val
+		o.forceful = val
 	}
 	if val, err := args.Bool("--verbose"); err == nil {
-		opts.verbose = val
+		o.verbose = val
 	}
+	return
+}
+
+func main() {
+	opts = parseOptions(nil)
 	fmt.Printf("Starting with options: %+v\n", opts)
 
 	tracker := &tracker{avgCpu: NewMovingAvg(opts.avgWindow)}
