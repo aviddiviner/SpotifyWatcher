@@ -40,7 +40,11 @@ type tracker struct {
 	avgCpu *MovingAvg
 }
 
-func (t *tracker) kill(p Process) error {
+func newTracker() *tracker {
+	return &tracker{avgCpu: NewMovingAvg(opts.avgWindow)}
+}
+
+func (t *tracker) Kill(p Process) error {
 	fmt.Println(">>> Killing Spotify!")
 	pid, err := strconv.Atoi(p.Pid)
 	if err != nil {
@@ -49,7 +53,7 @@ func (t *tracker) kill(p Process) error {
 	return kill(pid)
 }
 
-func (t *tracker) observe(p Process) error {
+func (t *tracker) Observe(p Process) error {
 	if p == (Process{}) {
 		// Nil process; reset the moving average and return.
 		t.avgCpu.Reset()
@@ -79,14 +83,14 @@ func (t *tracker) observe(p Process) error {
 	if samples == opts.avgWindow {
 		// Too busy; kill.
 		if average > opts.busyThreshold {
-			return t.kill(p)
+			return t.Kill(p)
 		}
 		if state == StatePlaying || state == StateForeground {
 			return nil
 		}
 		// In the background, not playing, but idling high; kill.
 		if average > opts.idleThreshold {
-			return t.kill(p)
+			return t.Kill(p)
 		}
 	}
 	return nil
@@ -119,13 +123,30 @@ func main() {
 	opts = parseOptions(nil)
 	fmt.Printf("Starting with options: %+v\n", opts)
 
-	tracker := &tracker{avgCpu: NewMovingAvg(opts.avgWindow)}
+	metrics := newInfluxAgent()
+	tracker := newTracker()
 	top := NewTop(opts.topInterval)
 	fmt.Println("Waiting to observe Spotify...")
 	for {
 		select {
 		case <-top.NextTick:
 			var spotify Process
+			batch := metrics.NewBatch()
+			addMetricPoint := func(p Process) {
+				metrics.AddPoint(batch, "process",
+					metricTags{
+						"command": p.Command,
+					},
+					metricFields{
+						"pid":     p.Pid,
+						"cpu":     p.Cpu,
+						"threads": p.Threads,
+						"state":   p.State,
+						"time":    p.Time,
+						"pageins": p.Pageins,
+						"command": p.Command,
+					})
+			}
 			headerShown := false
 			showProcessLine := func(p Process) {
 				if !opts.verbose {
@@ -140,12 +161,16 @@ func main() {
 			for _, p := range top.ProcessList() {
 				if strings.HasPrefix(p.Command, "Spotify") {
 					showProcessLine(p)
+					addMetricPoint(p)
 					if p.Command == "Spotify" {
 						spotify = p
 					}
 				}
 			}
-			if err := tracker.observe(spotify); err != nil {
+			if err := metrics.Write(batch); err != nil {
+				// log.Fatal(err)
+			}
+			if err := tracker.Observe(spotify); err != nil {
 				log.Fatal(err)
 			}
 		}
