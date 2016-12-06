@@ -71,8 +71,8 @@ func (t *tracker) observe(p Process) error {
 	}
 
 	t.avgCpu.Append(cpu)
-	samples := t.avgCpu.Samples()
-	average := t.avgCpu.Value()
+	samples := t.avgCpu.Length()
+	average := t.avgCpu.Average()
 	fmt.Printf("Spotify: %s, CPU: %.2f (%.2f avg, samples: %d)\n", state, cpu, average, samples)
 
 	// Take action if we have sufficient samples.

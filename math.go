@@ -2,42 +2,63 @@ package main
 
 // Not safe for concurrent use.
 
-type MovingAvg struct {
+type SlidingWindow struct {
 	size   int
 	idx    int
-	window []float64
+	window []interface{}
 }
 
-func (v *MovingAvg) Append(f float64) {
-	if len(v.window) < v.size { // Grow the window.
-		v.window = v.window[:v.idx+1]
+func (s *SlidingWindow) Append(f interface{}) {
+	if len(s.window) < s.size { // Grow the window.
+		s.window = s.window[:s.idx+1]
 	}
-	v.window[v.idx] = f
-	v.idx = (v.idx + 1) % v.size
+	s.window[s.idx] = f
+	s.idx = (s.idx + 1) % s.size
 	return
 }
 
-func (v *MovingAvg) Value() float64 {
-	total := 0.0
-	for _, n := range v.window {
-		total += n
-	}
-	return total / float64(len(v.window))
+func (s *SlidingWindow) Reset() {
+	s.idx = 0
+	s.window = s.window[:0]
 }
 
-func (v *MovingAvg) Reset() {
-	v.idx = 0
-	v.window = v.window[:0]
+func (s *SlidingWindow) Length() int {
+	return len(s.window)
 }
 
-func (v *MovingAvg) Samples() int {
-	return len(v.window)
-}
-
-func NewMovingAvg(size int) *MovingAvg {
+func NewSlidingWindow(size int) *SlidingWindow {
 	if size <= 0 {
 		panic("invalid window size")
 	}
-	slice := make([]float64, size)
-	return &MovingAvg{size: size, window: slice[:0]}
+	slice := make([]interface{}, size)
+	return &SlidingWindow{size: size, window: slice[:0]}
+}
+
+// -----------------------------------------------------------------------------
+
+type MovingAvg struct {
+	*SlidingWindow
+}
+
+func (v *MovingAvg) SumFn(fn func(float64) float64) float64 {
+	total := 0.0
+	for _, n := range v.window {
+		switch f := n.(type) {
+		case float64:
+			total += fn(f)
+		case int:
+			total += fn(float64(f))
+		default:
+		}
+	}
+	return total
+}
+
+func (v *MovingAvg) Average() float64 {
+	total := v.SumFn(func(f float64) float64 { return f })
+	return total / float64(v.Length())
+}
+
+func NewMovingAvg(size int) *MovingAvg {
+	return &MovingAvg{NewSlidingWindow(size)}
 }
