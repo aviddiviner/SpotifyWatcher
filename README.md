@@ -17,14 +17,14 @@ $ ./SpotifyWatcher --help
 Monitor Spotify background CPU usage and kill it if it misbehaves.
 
 Usage:
-  SpotifyWatcher [-t SECONDS] [-i CPU] [-p CPU] [-s SAMPLES] [-f] [-v]
+  SpotifyWatcher [-s SECONDS] [-i CPU] [-p CPU] [-n SAMPLES] [-f] [-v]
   SpotifyWatcher -h | --help | --version
 
 Options:
-  -t SECONDS    Interval in secs with which to poll 'top' [default: 3].
+  -s SECONDS    Interval in secs with which to poll 'top' [default: 4].
   -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
-  -s SAMPLES    Moving average sample window size [default: 5].
+  -n SAMPLES    Median sample window size [default: 5].
   -f --force    Monitor CPU even if Spotify is the frontmost (active) window.
   -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.

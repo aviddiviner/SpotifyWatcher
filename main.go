@@ -16,10 +16,10 @@ Usage:
   SpotifyWatcher -h | --help | --version
 
 Options:
-  -s SECONDS    Interval in secs with which to poll 'top' [default: 3].
+  -s SECONDS    Interval in secs with which to poll 'top' [default: 4].
   -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
-  -n SAMPLES    Moving average sample window size [default: 5].
+  -n SAMPLES    Median sample window size [default: 5].
   -f --force    Monitor CPU even if Spotify is the frontmost (active) window.
   -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.
@@ -76,20 +76,20 @@ func (t *tracker) Observe(p Process) error {
 
 	t.avgCpu.Append(cpu)
 	samples := t.avgCpu.Len()
-	average := t.avgCpu.Average()
-	fmt.Printf("Spotify: %s, CPU: %.2f (%.2f avg, samples: %d)\n", state, cpu, average, samples)
+	median := t.avgCpu.Median()
+	fmt.Printf("Spotify: %s, CPU: %.2f (%.2f median, samples: %d)\n", state, cpu, median, samples)
 
 	// Take action if we have sufficient samples.
 	if samples == opts.avgWindow {
 		// Too busy; kill.
-		if average > opts.busyThreshold {
+		if median > opts.busyThreshold {
 			return t.Kill(p)
 		}
 		if state == StatePlaying || state == StateForeground {
 			return nil
 		}
 		// In the background, not playing, but idling high; kill.
-		if average > opts.idleThreshold {
+		if median > opts.idleThreshold {
 			return t.Kill(p)
 		}
 	}
