@@ -19,7 +19,7 @@ var usageTestTable = []struct {
 			topInterval:   5,
 			idleThreshold: 3.0,
 			busyThreshold: 6.0,
-			avgWindow:     7,
+			windowLength:  7,
 			forceful:      true,
 			verbose:       true,
 		},

@@ -29,7 +29,7 @@ type options struct {
 	topInterval   int
 	idleThreshold float64
 	busyThreshold float64
-	avgWindow     int
+	windowLength  int
 	forceful      bool
 	verbose       bool
 }
@@ -37,11 +37,11 @@ type options struct {
 var opts = options{}
 
 type tracker struct {
-	avgCpu *MovingAvg
+	avgCpu *FloatWindow
 }
 
 func newTracker() *tracker {
-	return &tracker{avgCpu: NewMovingAvg(opts.avgWindow)}
+	return &tracker{avgCpu: NewFloatWindow(opts.windowLength)}
 }
 
 func (t *tracker) Kill(p Process) error {
@@ -80,7 +80,7 @@ func (t *tracker) Observe(p Process) error {
 	fmt.Printf("Spotify: %s, CPU: %.2f (%.2f median, samples: %d)\n", state, cpu, median, samples)
 
 	// Take action if we have sufficient samples.
-	if samples == opts.avgWindow {
+	if samples == opts.windowLength {
 		// Too busy; kill.
 		if median > opts.busyThreshold {
 			return t.Kill(p)
@@ -108,7 +108,7 @@ func parseOptions(argv []string) (o options) {
 		o.busyThreshold = val
 	}
 	if val, err := args.Int("-n"); err == nil {
-		o.avgWindow = val
+		o.windowLength = val
 	}
 	if val, err := args.Bool("--force"); err == nil {
 		o.forceful = val

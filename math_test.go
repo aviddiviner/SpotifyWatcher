@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-var movingAvgTestTable = []struct {
+var floatWindowTestTable = []struct {
 	in  float64
 	out float64
 }{
@@ -42,17 +42,17 @@ func assertFloatsEqual(t *testing.T, result, expected float64) {
 	}
 }
 
-func TestMovingAvg(t *testing.T) {
-	avg := NewMovingAvg(5)
-	for i, tt := range movingAvgTestTable {
+func TestFloatWindow(t *testing.T) {
+	avg := NewFloatWindow(5)
+	for i, tt := range floatWindowTestTable {
 		avg.Append(tt.in)
-		t.Logf("MovingAvg(%d, %.2f) => %.2f", i, tt.in, tt.out)
+		t.Logf("FloatWindow(%d, %.2f) => %.2f", i, tt.in, tt.out)
 		assertFloatsEqual(t, avg.Average(), tt.out)
 	}
 }
 
-func TestMovingAvgReset(t *testing.T) {
-	avg := NewMovingAvg(5)
+func TestFloatWindowReset(t *testing.T) {
+	avg := NewFloatWindow(5)
 	avg.Append(1.0)
 	avg.Append(2.0)
 	assertFloatsEqual(t, avg.Average(), 1.5)
@@ -67,8 +67,8 @@ func TestMovingAvgReset(t *testing.T) {
 	}
 }
 
-func TestEmptyMovingAvgIsNaN(t *testing.T) {
-	avg := NewMovingAvg(5)
+func TestEmptyFloatWindowIsNaN(t *testing.T) {
+	avg := NewFloatWindow(5)
 	if !math.IsNaN(avg.Average()) {
 		t.Errorf("NaN expected")
 	}
@@ -78,14 +78,14 @@ func TestEmptyMovingAvgIsNaN(t *testing.T) {
 	}
 }
 
-func TestMovingAvgSumFn(t *testing.T) {
+func TestFloatWindowSumFn(t *testing.T) {
 	greaterThan1 := func(f float64) float64 {
 		if f > 1 {
 			return 1
 		}
 		return 0
 	}
-	avg := NewMovingAvg(5)
+	avg := NewFloatWindow(5)
 	avg.Append(0.8)
 	avg.Append(1.8)
 	avg.Append(2)
@@ -97,8 +97,8 @@ func TestMovingAvgSumFn(t *testing.T) {
 	assertFloatsEqual(t, avg.SumFn(greaterThan1), 0)
 }
 
-func TestMovingAvgMedian(t *testing.T) {
-	avg := NewMovingAvg(5)
+func TestFloatWindowMedian(t *testing.T) {
+	avg := NewFloatWindow(5)
 
 	// Single value
 	avg.Append(0.8)
@@ -142,8 +142,8 @@ func TestMovingAvgMedian(t *testing.T) {
 	assertFloatsEqual(t, avg.Average(), 4)
 }
 
-func TestMovingAvgQuantile(t *testing.T) {
-	avg := NewMovingAvg(3)
+func TestFloatWindowQuantile(t *testing.T) {
+	avg := NewFloatWindow(3)
 	avg.Append(0)
 	avg.Append(10)
 	avg.Append(30)
