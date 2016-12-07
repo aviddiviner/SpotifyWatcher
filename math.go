@@ -99,8 +99,9 @@ func NewMovingAvg(size int) *MovingAvg {
 	return &MovingAvg{NewSlidingWindow(size)}
 }
 
-// Median returns the middle value.
-func (v *MovingAvg) Median() float64 {
+// Quantile returns the p-quantile of the sorted values. For example, the median
+// can be computed using p = 0.5, the first quartile at p = 0.25.
+func (v *MovingAvg) Quantile(p float64) float64 {
 	if v.Len() < 1 {
 		return math.NaN()
 	}
@@ -109,13 +110,23 @@ func (v *MovingAvg) Median() float64 {
 	}
 	vc := &MovingAvg{v.Copy()}
 	sort.Sort(vc)
-	// TODO: func Quantile(p float64). Instead of 0.5, we can use p.
-	// Also, special cases:
-	//  if p <= 0 return first value
-	//  if p >= 1 return last value
-	h := float64(vc.Len()-1) * 0.5
+	if p <= 0 {
+		// fmt.Printf("%#v p<=0\n", vc.window)
+		return vc.asFloat(0)
+	}
+	if p >= 1 {
+		// fmt.Printf("%#v p>=0\n", vc.window)
+		return vc.asFloat(vc.Len() - 1)
+	}
+	h := float64(vc.Len()-1) * p
 	i := int(math.Floor(h))
 	a := vc.asFloat(i)
 	b := vc.asFloat(i + 1)
+	// fmt.Printf("%#v p=%#v h:%#v i:%#v a:%#v b:%#v\n", vc.window, p, h, i, a, b)
 	return a + (b-a)*(h-float64(i))
+}
+
+// Median returns the middle value.
+func (v *MovingAvg) Median() float64 {
+	return v.Quantile(0.5)
 }

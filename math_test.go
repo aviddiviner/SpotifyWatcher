@@ -90,8 +90,10 @@ func TestMovingAvgSumFn(t *testing.T) {
 	avg.Append(1.8)
 	avg.Append(2)
 	avg.Append(5)
+	t.Log("SumFn(>1) => 3")
 	assertFloatsEqual(t, avg.SumFn(greaterThan1), 3)
 	avg.Reset()
+	t.Log("SumFn(>1) => 0")
 	assertFloatsEqual(t, avg.SumFn(greaterThan1), 0)
 }
 
@@ -138,4 +140,23 @@ func TestMovingAvgMedian(t *testing.T) {
 	avg.Append(0)
 	assertFloatsEqual(t, avg.Median(), 3)
 	assertFloatsEqual(t, avg.Average(), 4)
+}
+
+func TestMovingAvgQuantile(t *testing.T) {
+	avg := NewMovingAvg(3)
+	avg.Append(0)
+	avg.Append(10)
+	avg.Append(30)
+	t.Log("Quantile(0) => 0")
+	assertFloatsEqual(t, avg.Quantile(0), 0)
+	t.Log("Quantile(0.5) => 10")
+	assertFloatsEqual(t, avg.Quantile(0.5), 10)
+	t.Log("Quantile(1) => 30")
+	assertFloatsEqual(t, avg.Quantile(1), 30)
+	t.Log("Quantile(0.25) => 5")
+	assertFloatsEqual(t, avg.Quantile(0.25), 5)
+	t.Log("Quantile(0.75) => 20")
+	assertFloatsEqual(t, avg.Quantile(0.75), 20)
+	t.Log("Quantile(0.1) => 2")
+	assertFloatsEqual(t, avg.Quantile(0.1), 2)
 }
