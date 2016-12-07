@@ -56,13 +56,13 @@ func TestMovingAvgReset(t *testing.T) {
 	avg.Append(1.0)
 	avg.Append(2.0)
 	assertFloatsEqual(t, avg.Average(), 1.5)
-	if avg.Length() != 2 {
+	if avg.Len() != 2 {
 		t.Error("invalid length")
 	}
 	avg.Reset()
 	avg.Append(0.05)
 	assertFloatsEqual(t, avg.Average(), 0.05)
-	if avg.Length() != 1 {
+	if avg.Len() != 1 {
 		t.Error("invalid length")
 	}
 }

@@ -22,8 +22,12 @@ func (s *SlidingWindow) Reset() {
 	s.window = s.window[:0]
 }
 
-func (s *SlidingWindow) Length() int {
+func (s *SlidingWindow) Len() int {
 	return len(s.window)
+}
+
+func (s *SlidingWindow) Swap(i, j int) {
+	s.window[i], s.window[j] = s.window[j], s.window[i]
 }
 
 func NewSlidingWindow(size int) *SlidingWindow {
@@ -38,6 +42,25 @@ func NewSlidingWindow(size int) *SlidingWindow {
 
 type MovingAvg struct {
 	*SlidingWindow
+}
+
+func (v *MovingAvg) Less(i, j int) bool {
+	var a, b float64
+	switch n := v.window[i].(type) {
+	case float64:
+		a = n
+	case int:
+		a = float64(n)
+	default:
+	}
+	switch n := v.window[j].(type) {
+	case float64:
+		a = n
+	case int:
+		a = float64(n)
+	default:
+	}
+	return a < b
 }
 
 func (v *MovingAvg) SumFn(fn func(float64) float64) float64 {
@@ -56,7 +79,7 @@ func (v *MovingAvg) SumFn(fn func(float64) float64) float64 {
 
 func (v *MovingAvg) Average() float64 {
 	total := v.SumFn(func(f float64) float64 { return f })
-	return total / float64(v.Length())
+	return total / float64(v.Len())
 }
 
 func NewMovingAvg(size int) *MovingAvg {
