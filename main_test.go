@@ -16,12 +16,12 @@ var usageTestTable = []struct {
 	{
 		"-s 5 -i 3 -p 6 -n 7 -f -v",
 		options{
-			topInterval:   5,
-			idleThreshold: 3.0,
-			busyThreshold: 6.0,
-			windowLength:  7,
-			forceful:      true,
-			verbose:       true,
+			TopInterval:   5,
+			IdleThreshold: 3.0,
+			BusyThreshold: 6.0,
+			WindowLength:  7,
+			Force:         true,
+			Verbose:       true,
 		},
 	},
 }

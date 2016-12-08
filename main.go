@@ -26,22 +26,22 @@ Options:
   --version     Show version.`
 
 type options struct {
-	topInterval   int
-	idleThreshold float64
-	busyThreshold float64
-	windowLength  int
-	forceful      bool
-	verbose       bool
+	TopInterval   int     `docopt:"-s"`
+	IdleThreshold float64 `docopt:"-i"`
+	BusyThreshold float64 `docopt:"-p"`
+	WindowLength  int     `docopt:"-n"`
+	Force         bool
+	Verbose       bool
 }
 
-var opts = options{}
+var opts options
 
 type tracker struct {
 	avgCpu *FloatWindow
 }
 
 func newTracker() *tracker {
-	return &tracker{avgCpu: NewFloatWindow(opts.windowLength)}
+	return &tracker{avgCpu: NewFloatWindow(opts.WindowLength)}
 }
 
 func (t *tracker) Kill(p Process) error {
@@ -69,7 +69,7 @@ func (t *tracker) Observe(p Process) error {
 		return err
 	}
 	// Active in the foreground; ignore, unless forceful.
-	if state == StateForeground && !opts.forceful {
+	if state == StateForeground && !opts.Force {
 		fmt.Printf("Spotify: foreground (ignored), CPU: %.2f\n", cpu)
 		return nil
 	}
@@ -80,16 +80,16 @@ func (t *tracker) Observe(p Process) error {
 	fmt.Printf("Spotify: %s, CPU: %.2f (%.2f median, samples: %d)\n", state, cpu, median, samples)
 
 	// Take action if we have sufficient samples.
-	if samples == opts.windowLength {
+	if samples == opts.WindowLength {
 		// Too busy; kill.
-		if median > opts.busyThreshold {
+		if median > opts.BusyThreshold {
 			return t.Kill(p)
 		}
 		if state == StatePlaying || state == StateForeground {
 			return nil
 		}
 		// In the background, not playing, but idling high; kill.
-		if median > opts.idleThreshold {
+		if median > opts.IdleThreshold {
 			return t.Kill(p)
 		}
 	}
@@ -98,23 +98,9 @@ func (t *tracker) Observe(p Process) error {
 
 func parseOptions(argv []string) (o options) {
 	args, _ := docopt.ParseArgs(usage, argv, "0.2")
-	if val, err := args.Int("-s"); err == nil {
-		o.topInterval = val
-	}
-	if val, err := args.Float64("-i"); err == nil {
-		o.idleThreshold = val
-	}
-	if val, err := args.Float64("-p"); err == nil {
-		o.busyThreshold = val
-	}
-	if val, err := args.Int("-n"); err == nil {
-		o.windowLength = val
-	}
-	if val, err := args.Bool("--force"); err == nil {
-		o.forceful = val
-	}
-	if val, err := args.Bool("--verbose"); err == nil {
-		o.verbose = val
+	err := args.Bind(&o)
+	if err != nil {
+		log.Fatal(err)
 	}
 	return
 }
@@ -125,7 +111,7 @@ func main() {
 
 	metrics := newInfluxAgent()
 	tracker := newTracker()
-	top := NewTop(opts.topInterval)
+	top := NewTop(opts.TopInterval)
 	fmt.Println("Waiting to observe Spotify...")
 	for {
 		select {
@@ -154,7 +140,7 @@ func main() {
 			}
 			headerShown := false
 			showProcessLine := func(p Process) {
-				if !opts.verbose {
+				if !opts.Verbose {
 					return
 				}
 				if !headerShown {
