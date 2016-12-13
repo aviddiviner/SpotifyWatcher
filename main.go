@@ -12,7 +12,7 @@ import (
 var usage = `Monitor Spotify background CPU usage and kill it if it misbehaves.
 
 Usage:
-  SpotifyWatcher [-s SECONDS] [-i CPU] [-p CPU] [-n SAMPLES] [-f] [-v]
+  SpotifyWatcher [-s SECONDS] [-i CPU] [-p CPU] [-n SAMPLES] [-f] [-q|-v]
   SpotifyWatcher -h | --help | --version
 
 Options:
@@ -21,6 +21,7 @@ Options:
   -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
   -n SAMPLES    Median sample window size [default: 5].
   -f --force    Monitor CPU even if Spotify is the frontmost (active) window.
+  -q --quiet    Only output console message when Spotify is misbehaving.
   -v --verbose  Show details of all matching Spotify processes each tick.
   -h --help     Show this screen.
   --version     Show version.`
@@ -30,6 +31,7 @@ type options struct {
 	IdleThreshold float64 `docopt:"-i"`
 	BusyThreshold float64 `docopt:"-p"`
 	WindowLength  int     `docopt:"-n"`
+	Quiet         bool
 	Force         bool
 	Verbose       bool
 }
@@ -70,14 +72,18 @@ func (t *tracker) Observe(p Process) error {
 	}
 	// Active in the foreground; ignore, unless forceful.
 	if state == StateForeground && !opts.Force {
-		fmt.Printf("Spotify: foreground (ignored), CPU: %.2f\n", cpu)
+		if !opts.Quiet {
+			fmt.Printf("Spotify: foreground (ignored), CPU: %.2f\n", cpu)
+		}
 		return nil
 	}
 
 	t.avgCpu.Append(cpu)
 	samples := t.avgCpu.Len()
 	median := t.avgCpu.Median()
-	fmt.Printf("Spotify: %s, CPU: %.2f (%.2f median, samples: %d)\n", state, cpu, median, samples)
+	if !opts.Quiet {
+		fmt.Printf("Spotify: %s, CPU: %.2f (%.2f median, samples: %d)\n", state, cpu, median, samples)
+	}
 
 	// Take action if we have sufficient samples.
 	if samples == opts.WindowLength {
