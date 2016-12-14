@@ -14,14 +14,15 @@ var usageTestTable = []struct {
 	opts options // Expected options parsed
 }{
 	{
-		"-s 5 -i 3 -p 6 -n 7 -f -v",
+		"-s 5 -t 3 -w6 -n 7 -f -v",
 		options{
-			TopInterval:   5,
-			IdleThreshold: 3.0,
-			BusyThreshold: 6.0,
-			WindowLength:  7,
-			Force:         true,
-			Verbose:       true,
+			TopInterval:     5,
+			CpuThreshold:    3.0,
+			WindowLength:    6,
+			AllowedBreaches: 7,
+			Quiet:           false,
+			Force:           true,
+			Verbose:         true,
 		},
 	},
 }

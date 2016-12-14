@@ -12,14 +12,14 @@ import (
 var usage = `Monitor Spotify background CPU usage and kill it if it misbehaves.
 
 Usage:
-  SpotifyWatcher [-s SECONDS] [-i CPU] [-p CPU] [-n SAMPLES] [-f] [-q|-v]
+  SpotifyWatcher [-s SECONDS] [-t CPU] [-w LENGTH] [-n ALLOWED] [-f] [-q|-v]
   SpotifyWatcher -h | --help | --version
 
 Options:
   -s SECONDS    Interval in secs with which to poll 'top' [default: 4].
-  -i CPU        Idle CPU threshold at which to kill Spotify [default: 8.0].
-  -p CPU        Playback CPU threshold at which to kill Spotify [default: 25.0].
-  -n SAMPLES    Median sample window size [default: 5].
+  -t CPU        CPU threshold at which to kill Spotify [default: 8.0].
+  -w LENGTH     Median sample window size [default: 5].
+  -n ALLOWED    Max intervals exceeding threshold before killing [default: 20].
   -f --force    Monitor CPU even if Spotify is the frontmost (active) window.
   -q --quiet    Only output console message when Spotify is misbehaving.
   -v --verbose  Show details of all matching Spotify processes each tick.
@@ -27,19 +27,20 @@ Options:
   --version     Show version.`
 
 type options struct {
-	TopInterval   int     `docopt:"-s"`
-	IdleThreshold float64 `docopt:"-i"`
-	BusyThreshold float64 `docopt:"-p"`
-	WindowLength  int     `docopt:"-n"`
-	Quiet         bool
-	Force         bool
-	Verbose       bool
+	TopInterval     int     `docopt:"-s"`
+	CpuThreshold    float64 `docopt:"-t"`
+	WindowLength    int     `docopt:"-w"`
+	AllowedBreaches int     `docopt:"-n"`
+	Quiet           bool
+	Force           bool
+	Verbose         bool
 }
 
 var opts options
 
 type tracker struct {
-	avgCpu *FloatWindow
+	avgCpu   *FloatWindow
+	breaches int
 }
 
 func newTracker() *tracker {
@@ -47,11 +48,17 @@ func newTracker() *tracker {
 }
 
 func (t *tracker) Kill(p Process) error {
-	fmt.Println(">>> Killing Spotify!")
+	if t.breaches < opts.AllowedBreaches {
+		log.Println("Spotify is misbehaving!")
+		t.breaches += 1
+		return nil
+	}
+	log.Println("Okay, that's enough now. Killing Spotify!")
 	pid, err := strconv.Atoi(p.Pid)
 	if err != nil {
 		return err
 	}
+	t.breaches = 0
 	return kill(pid)
 }
 
@@ -73,7 +80,7 @@ func (t *tracker) Observe(p Process) error {
 	// Active in the foreground; ignore, unless forceful.
 	if state == StateForeground && !opts.Force {
 		if !opts.Quiet {
-			fmt.Printf("Spotify: foreground (ignored), CPU: %.2f\n", cpu)
+			log.Printf("Spotify: foreground (ignored), CPU: %.2f\n", cpu)
 		}
 		return nil
 	}
@@ -82,20 +89,13 @@ func (t *tracker) Observe(p Process) error {
 	samples := t.avgCpu.Len()
 	median := t.avgCpu.Median()
 	if !opts.Quiet {
-		fmt.Printf("Spotify: %s, CPU: %.2f (%.2f median, samples: %d)\n", state, cpu, median, samples)
+		log.Printf("Spotify: %s, CPU: %.2f (%.2f median, samples: %d)\n", state, cpu, median, samples)
 	}
 
 	// Take action if we have sufficient samples.
 	if samples == opts.WindowLength {
 		// Too busy; kill.
-		if median > opts.BusyThreshold {
-			return t.Kill(p)
-		}
-		if state == StatePlaying || state == StateForeground {
-			return nil
-		}
-		// In the background, not playing, but idling high; kill.
-		if median > opts.IdleThreshold {
+		if median > opts.CpuThreshold {
 			return t.Kill(p)
 		}
 	}
@@ -103,7 +103,7 @@ func (t *tracker) Observe(p Process) error {
 }
 
 func parseOptions(argv []string) (o options) {
-	args, _ := docopt.ParseArgs(usage, argv, "0.2")
+	args, _ := docopt.ParseArgs(usage, argv, "0.3")
 	err := args.Bind(&o)
 	if err != nil {
 		log.Fatal(err)
@@ -113,12 +113,12 @@ func parseOptions(argv []string) (o options) {
 
 func main() {
 	opts = parseOptions(nil)
-	fmt.Printf("Starting with options: %+v\n", opts)
+	log.Printf("Starting with options: %+v\n", opts)
 
 	metrics := newInfluxAgent()
 	tracker := newTracker()
 	top := NewTop(opts.TopInterval)
-	fmt.Println("Waiting to observe Spotify...")
+	log.Println("Waiting to observe Spotify...")
 	for {
 		select {
 		case <-top.NextTick:
