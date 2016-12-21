@@ -41,31 +41,53 @@ var opts options
 type tracker struct {
 	avgCpu   *FloatWindow
 	breaches int
+	closing  bool
 }
 
 func newTracker() *tracker {
 	return &tracker{avgCpu: NewFloatWindow(opts.WindowLength)}
 }
 
-func (t *tracker) Kill(p Process) error {
+func (t *tracker) reset() {
+	t.avgCpu.Reset()
+	t.breaches = 0
+	t.closing = false
+}
+
+func (t *tracker) CloseSpotify() error {
+	// We've told Spotify to close itself. Wait for it a bit, before erroring.
+	if t.closing {
+		if t.breaches < opts.AllowedBreaches+5 {
+			log.Println("Spotify is trying to close itself...")
+			t.breaches += 1
+			return nil
+		}
+		return fmt.Errorf("Spotify failed to close, must be forcibly killed")
+	}
+	// Spotify hasn't been told to close, but it's now misbehaving.
 	if t.breaches < opts.AllowedBreaches {
 		log.Println("Spotify is misbehaving!")
 		t.breaches += 1
 		return nil
 	}
-	log.Println("Okay, that's enough now. Killing Spotify!")
+	log.Println("Okay, that's enough now. Closing Spotify.")
+	t.closing = true
+	return TellSpotifyToQuit()
+}
+
+func (t *tracker) Kill(p Process) error {
+	log.Println("Killing the Spotify process!")
 	pid, err := strconv.Atoi(p.Pid)
 	if err != nil {
 		return err
 	}
-	t.breaches = 0
 	return kill(pid)
 }
 
 func (t *tracker) Observe(p Process) error {
 	if p == (Process{}) {
-		// Nil process; reset the moving average and return.
-		t.avgCpu.Reset()
+		// Nil process means no Spotify, so reset all counters and return.
+		t.reset()
 		return nil
 	}
 	cpu, err := strconv.ParseFloat(p.Cpu, 64)
@@ -93,9 +115,8 @@ func (t *tracker) Observe(p Process) error {
 	}
 
 	// Take action if we have sufficient samples.
-	if samples == opts.WindowLength {
-		// Too busy; kill.
-		if median > opts.CpuThreshold {
+	if samples == opts.WindowLength && median > opts.CpuThreshold {
+		if err := t.CloseSpotify(); err != nil {
 			return t.Kill(p)
 		}
 	}
@@ -118,7 +139,6 @@ func main() {
 	metrics := newInfluxAgent()
 	tracker := newTracker()
 	top := NewTop(opts.TopInterval)
-	log.Println("Waiting to observe Spotify...")
 	for {
 		select {
 		case <-top.NextTick:

@@ -56,3 +56,7 @@ func SpotifyState() (s State, err error) {
 	}
 	return
 }
+
+func TellSpotifyToQuit() error {
+	return exec.Command(`osascript -e 'tell application "Spotify" to quit'`).Run()
+}
