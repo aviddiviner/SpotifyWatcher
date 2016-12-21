@@ -3,36 +3,22 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"os/exec"
 	"strings"
 )
 
-type State int
-
-func (s State) String() string {
-	switch s {
-	case StateForeground:
-		return "foreground"
-	case StateStopped:
-		return "stopped"
-	case StatePlaying:
-		return "playing"
-	case StatePaused:
-		return "paused"
-	case StateClosed:
-		return "closed"
-	}
-	return "unknown"
-}
+type State string
 
 const (
-	StateUnknown State = iota
-	StateForeground
-	StateStopped
-	StatePlaying
-	StatePaused
-	StateClosed
+	StateUnknown    State = "unknown"
+	StateForeground State = "foreground"
+	StateStopped    State = "stopped"
+	StatePlaying    State = "playing"
+	StatePaused     State = "paused"
+	StateClosing    State = "closing"
+	StateClosed     State = "closed"
 )
 
 func SpotifyState() (s State, err error) {
@@ -58,5 +44,9 @@ func SpotifyState() (s State, err error) {
 }
 
 func TellSpotifyToQuit() error {
-	return exec.Command(`osascript -e 'tell application "Spotify" to quit'`).Run()
+	var script bytes.Buffer
+	script.WriteString(`tell application "Spotify" to quit`)
+	cmd := exec.Command("/usr/bin/osascript")
+	cmd.Stdin = &script
+	return cmd.Run()
 }

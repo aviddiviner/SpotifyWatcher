@@ -84,6 +84,14 @@ func (t *tracker) Kill(p Process) error {
 	return kill(pid)
 }
 
+func (t *tracker) spotifyState() (State, error) {
+	if t.closing {
+		return StateClosing, nil
+	} else {
+		return SpotifyState()
+	}
+}
+
 func (t *tracker) Observe(p Process) error {
 	if p == (Process{}) {
 		// Nil process means no Spotify, so reset all counters and return.
@@ -95,7 +103,7 @@ func (t *tracker) Observe(p Process) error {
 		return err
 	}
 	// Check state: foreground, background (playing/paused/etc).
-	state, err := SpotifyState()
+	state, err := t.spotifyState()
 	if err != nil {
 		return err
 	}
