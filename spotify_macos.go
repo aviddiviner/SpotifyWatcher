@@ -12,7 +12,7 @@ import (
 type State string
 
 const (
-	StateUnknown    State = "unknown"
+	StateUnknown    State = ""
 	StateForeground State = "foreground"
 	StateStopped    State = "stopped"
 	StatePlaying    State = "playing"
@@ -21,8 +21,36 @@ const (
 	StateClosed     State = "closed"
 )
 
+func (s State) String() string {
+	if s == StateUnknown {
+		return "(unknown)"
+	}
+	return string(s)
+}
+
+func osascript(script string) *exec.Cmd {
+	var buf bytes.Buffer
+	buf.WriteString(strings.TrimSpace(script))
+	cmd := exec.Command("/usr/bin/osascript")
+	cmd.Stdin = &buf
+	return cmd
+}
+
+var checkStateScript = `
+if application "Spotify" is frontmost then
+	return "foreground"
+end if
+if application "Spotify" is running then
+	tell application "Spotify"
+		return player state as string  -- stopped/playing/paused
+	end tell
+else
+	return "closed"
+end if
+`
+
 func SpotifyState() (s State, err error) {
-	out, err := exec.Command("./SpotifyState.applescript").CombinedOutput()
+	out, err := osascript(checkStateScript).CombinedOutput()
 	if err != nil {
 		return
 	}
@@ -44,9 +72,5 @@ func SpotifyState() (s State, err error) {
 }
 
 func TellSpotifyToQuit() error {
-	var script bytes.Buffer
-	script.WriteString(`tell application "Spotify" to quit`)
-	cmd := exec.Command("/usr/bin/osascript")
-	cmd.Stdin = &script
-	return cmd.Run()
+	return osascript(`tell application "Spotify" to quit`).Run()
 }

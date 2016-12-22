@@ -84,11 +84,12 @@ func (t *tracker) Kill(p Process) error {
 	return kill(pid)
 }
 
-func (t *tracker) spotifyState() (State, error) {
+func (t *tracker) spotifyState() State {
 	if t.closing {
-		return StateClosing, nil
+		return StateClosing
 	} else {
-		return SpotifyState()
+		state, _ := SpotifyState()
+		return state
 	}
 }
 
@@ -103,10 +104,7 @@ func (t *tracker) Observe(p Process) error {
 		return err
 	}
 	// Check state: foreground, background (playing/paused/etc).
-	state, err := t.spotifyState()
-	if err != nil {
-		return err
-	}
+	state := t.spotifyState()
 	// Active in the foreground; ignore, unless forceful.
 	if state == StateForeground && !opts.Force {
 		if !opts.Quiet {
